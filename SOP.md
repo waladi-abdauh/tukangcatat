@@ -285,8 +285,29 @@ antrean + counter terpusat (Redis/Postgres) **dan** redesign
 ## 6. Deploy produksi (CI + VPS)
 
 Alurnya: push ke `master` → `verify` (tsc + lint + build + rakit paket) →
-berhenti menunggu approval → rsync → symlink swap → `pm2 startOrRestart` →
-smoke test.
+**berhenti di situ**. Tidak ada yang menyentuh server. Untuk benar-benar
+deploy, kamu klik **Run workflow** di tab Actions dan centang input `deploy`,
+baru `deploy` (rsync → symlink swap → `pm2 startOrRestart` → smoke test) jalan.
+
+### Kenapa gerbang manual pakai input, bukan environment protection rule
+
+Repo ini **private di akun personal Free**. GitHub Free hanya menyediakan
+*required reviewers* **dan** *environment secrets* untuk repo **public** — jadi
+`environment: production` tidak akan menjebak approval apa pun dan tidak bisa
+menyimpan secret. Semua secret karena itu disimpan sebagai **repository
+secret**.
+
+Gerbang sebenarnya ada di job `deploy`:
+
+```yaml
+if: github.event_name == 'workflow_dispatch' && inputs.deploy == true
+```
+
+Artinya tidak ada jalur dari `push` yang bisa langsung kena produksi.
+
+Kalau nanti kamu upgrade ke GitHub Pro, dua tambahan yang layak: `environment:
+production` di job deploy (deployment history + proteksi) dan Required
+reviewers di environment itu (approval jadi otomatis).
 
 ### Build di GitHub, bukan di VPS
 
@@ -317,8 +338,15 @@ ikut berubah saat deploy.
 git push origin master
 ```
 
-Lalu buka tab **Actions** di GitHub, pilih run `Deploy`, klik job
-`Deploy ke VPS`, tekan **Approve**. Job `verify` sudah harus hijau.
+Itu **saja**. Job `verify` jalan sendiri dan berhenti di situ.
+
+Untuk lanjut ke produksi:
+
+1. Buka tab **Actions** → pilih workflow **Deploy** → **Run workflow**.
+2. **Centang** `deploy`.
+3. Tunggu job `Deploy ke VPS` selesai (verifikasi `verify` sudah hijau dulu).
+
+Selesai. Tidak perlu approve apa pun.
 
 ### Rollback
 
@@ -358,10 +386,10 @@ di chat. Rotasi **wajib** sebelum webhook publik aktif:
 3. Kalau `NEXT_PUBLIC_APP_URL` berubah, itu **perlu rebuild** — nilainya
    di-inline saat build, restart tidak cukup.
 
-Secret runtime di GitHub: **Settings > Secrets and variables > Actions**.
-Variabel `NEXT_PUBLIC_*` pakai tab **Variables** (nilainya publik dan memang
-di-inline ke bundle browser). Environment `production` + required reviewers
-yang membuat workflow berhenti untuk approval.
+Secret runtime di GitHub: **Settings > Secrets and variables > Actions**,
+tab **Repository secrets** (BUKAN environment secret — lihat catatan di atas).
+Variabel `NEXT_PUBLIC_*` pakai tab **Variables** juga di level repository
+(nilainya publik dan memang di-inline ke bundle browser).
 
 ---
 

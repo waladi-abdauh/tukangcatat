@@ -1,15 +1,28 @@
 # Deploy CepatCatat ke VPS.
 #
-# Job `verify`  -> tsc + lint + build + rakit paket standalone (di runner GitHub,
-#                  BUKAN di VPS 1 GB) lalu upload sebagai artifact.
-# Job `deploy`  -> package production, jadi workflow BERHENTI dan menunggu
-#                  approval. Setelah disetujui: rsync ke releases/<sha>, symlink
-#                  swap, `pm2 reload` (drain penuh), smoke test, `pm2 save`.
+#_push ke master_  -> job `verify` saja: tsc + lint + build + rakit paket
+#                     standalone di runner GitHub (BUKAN di VPS 1 GB). Tidak ada
+#                     yang menyentuh server.
+# _Run workflow_    -> `verify` jalan lagi, lalu job `deploy` jalan HANYA kalau
+#                     input `deploy` dicentang. Jadi tidak ada jalan dari push
+#                     yang bisa langsung kena produksi: satu-satunya cara ke VPS
+#                     adalah klik manual "Run workflow" lalu centang `deploy`.
 #
-# Env dipakai:
+# Kenapa pakai input, bukan environment protection rule: repo ini private di
+# akun personal Free. GitHub Free hanya menyediakan required reviewers DAN
+# environment secrets untuk repo PUBLIC. Jadi `environment: production` di sini
+# tidak akan menjebak apa pun dan tidak bisa menyimpan secret -- semua secret
+# disimpan sebagai repository secret.
+#
+# Kalau nanti kamu upgrade ke GitHub Pro, dua hal yang layak ditambahkan:
+#   - `environment: production` di job deploy (deployment history + proteksi)
+#   - Required reviewers di environment itu (approval jadi otomatis)
+# Approval lewat `workflow_dispatch` sekarang sudah cukup karena repo ini
+# hanya kamu yang menulisnya.
+#
+# Env dipakai (semuanya repository-level):
 #   secrets -> VPS_SSH_KEY, VPS_HOST, VPS_USER, VPS_PORT (opsional),
-#              VPS_KNOWN_HOSTS (opsional, lebih aman daripada TOFU),
-#              CRON_SECRET (untuk smoke test endpoint cron)
+#              VPS_KNOWN_HOSTS (opsional, lebih aman daripada TOFU)
 #   vars    -> NEXT_PUBLIC_* (nilainya di-inline saat build, jadi harus ada di
 #              build env; ini bukan rahasia dan memang publik)
 
@@ -19,6 +32,12 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Centang untuk benar-benar deploy ke produksi'
+        type: boolean
+        required: false
+        default: false
 
 # Satu deployment menggeser symlink global + me-restart PM2. Dua workflow
 # paralel akan saling menimpa symlink dan me-restart proses dua kali.
@@ -88,9 +107,11 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Environment `production` = workflow berhenti di sini sampai ada yang
-    # menyetujui di tab Actions. Perlu dibuat manual di repo Settings dulu.
-    environment: production
+    # Ini yang jadi gerbang manual. Dipush -> job ini SKIPPED, tidak ada
+    # yang menyentuh VPS. Hanya jalan kalau workflow dijalankan manual dengan
+    # input `deploy` dicentang. `github.event_name` dipakai karena `inputs`
+    # tidak ada pada event push.
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy == true
     steps:
       - uses: actions/download-artifact@v4
         with:

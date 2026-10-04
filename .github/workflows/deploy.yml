@@ -1,0 +1,189 @@
+# Deploy CepatCatat ke VPS.
+#
+# Job `verify`  -> tsc + lint + build + rakit paket standalone (di runner GitHub,
+#                  BUKAN di VPS 1 GB) lalu upload sebagai artifact.
+# Job `deploy`  -> package production, jadi workflow BERHENTI dan menunggu
+#                  approval. Setelah disetujui: rsync ke releases/<sha>, symlink
+#                  swap, `pm2 reload` (drain penuh), smoke test, `pm2 save`.
+#
+# Env dipakai:
+#   secrets -> VPS_SSH_KEY, VPS_HOST, VPS_USER, VPS_PORT (opsional),
+#              VPS_KNOWN_HOSTS (opsional, lebih aman daripada TOFU),
+#              CRON_SECRET (untuk smoke test endpoint cron)
+#   vars    -> NEXT_PUBLIC_* (nilainya di-inline saat build, jadi harus ada di
+#              build env; ini bukan rahasia dan memang publik)
+
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Satu deployment menggeser symlink global + me-restart PM2. Dua workflow
+# paralel akan saling menimpa symlink dan me-restart proses dua kali.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # NEXT_PUBLIC_* di-inline ke bundle browser saat build. Kalau kosong, build
+      # tetap SUDAH dan deploy tetap jalan, tapi dashboard rusak dengan galat
+      # Supabase yang membingungkan. Jadi gagal di sini, lebih murah.
+      - name: Pastikan variabel public terisi
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+        run: |
+          for v in NEXT_PUBLIC_APP_URL NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_VAPID_PUBLIC_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::GitHub variable $v kosong. Isi di Settings > Secrets and variables > Actions > Variables." >&2
+              exit 1
+            fi
+          done
+          echo "Semua variabel public terisi."
+
+      - run: npx tsc --noEmit
+
+      - run: npm run lint
+
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+
+      # Rakit standalone + public + .next/static jadi satu folder `release/`.
+      - run: bash scripts/prepare-deploy.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release/
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy ke VPS
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Environment `production` = workflow berhenti di sini sampai ada yang
+    # menyetujui di tab Actions. Perlu dibuat manual di repo Settings dulu.
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          # printf (bukan echo) supaya newline private key tidak hilang.
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$VPS_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            # TOFU: host dicatat saat deploy pertama. Kalau VPS di-reinstall,
+            # hapus baris lama di secret VPS_KNOWN_HOSTS lalu isi ulang.
+            mkdir -p ~/.ssh
+            ssh-keyscan -p "${VPS_PORT:-22}" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
+      - name: Terapkan release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          RELEASE_SHA: ${{ github.sha }}
+          ROOT: /opt/cepatcatat
+        run: |
+          set -euo pipefail
+          SSH="ssh -p ${VPS_PORT:-22} -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_deploy ${VPS_USER}@${VPS_HOST}"
+
+          # Upload ke releases/<sha>. Folder terpisah per SHA penting: proses
+          # yang sedang melayani request tetap membaca file lamanya sendiri
+          # sampai selesai drain, walau symlink `current` sudah ditukar.
+          $SSH "mkdir -p ${ROOT}/releases/${RELEASE_SHA}"
+          rsync -az --delete -e "ssh -p ${VPS_PORT:-22} -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_deploy" \
+            release/ "${VPS_USER}@${VPS_HOST}:${ROOT}/releases/${RELEASE_SHA}/"
+
+          # Secret runtime TIDAK ikut git: Next memuat .env dari direktori
+          # tempat server.js dijalankan (process.cwd()), jadi symlink dari
+          # folder shared ke folder release ini yang kita pakai.
+          $SSH "test -f ${ROOT}/shared/.env || { echo 'ERROR: ${ROOT}/shared/.env belum ada di server.' >&2; exit 1; }; \
+                 ln -sfn ${ROOT}/shared/.env ${ROOT}/releases/${RELEASE_SHA}/.env"
+
+          # Tukar symlink lewat rename() supaya tidak pernah ada sedetik di mana
+          # `current` tidak menunjuk ke folder lengkap.
+          $SSH "ln -sfn ${ROOT}/releases/${RELEASE_SHA} ${ROOT}/current.tmp && mv -T ${ROOT}/current.tmp ${ROOT}/current"
+
+      - name: Restart PM2 + smoke test
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          RELEASE_SHA: ${{ github.sha }}
+          ROOT: /opt/cepatcatat
+        run: |
+          set -euo pipefail
+          SSH="ssh -p ${VPS_PORT:-22} -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/id_deploy ${VPS_USER}@${VPS_HOST}"
+
+          $SSH "command -v pm2 >/dev/null || { echo 'ERROR: pm2 belum terinstall di server.' >&2; exit 1; }"
+
+          # PENTING: `startOrRestart`, bukan `reload`.
+          # `pm2 reload` hanya zero-downtime di `cluster` mode; di `fork` mode
+          # (yang kita pakai karena antrean outbound-nya per-proses) reload
+          # jatuh ke perilaku restart: kill proses lama DULUAN, baru start yang
+          # baru. Jadi downtime = drain + boot, sekitar 3 detik kondisi normal.
+          # `startOrRestart` jujur soal itu, dan TIDAK memotong drain (lihat
+          # kill_timeout di ecosystem.config.js) -- memotong drain berarti
+          # catatan user hilang permanen karena dedupe sudah diklaim.
+          $SSH "cd ${ROOT} && pm2 startOrRestart ecosystem.config.js --update-env"
+
+          # Drain bisa memakan waktu (lihat kill_timeout di ecosystem.config.js),
+          # jadi tunggu dulu sebelum smoke test.
+          $SSH "sleep 15"
+
+          # Smoke test dari dalam VPS via loopback (port 3000 tidak dibuka ke
+          # publik; Caddy yang meneruskan trafik ke sana).
+          $SSH "test \"\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/)\" = 200 || { echo 'ERROR: landing page tidak 200' >&2; exit 1; }"
+          $SSH "test \"\$(curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/webhook/whatsapp)\" = 200 || { echo 'ERROR: endpoint webhook tidak 200' >&2; exit 1; }"
+
+          # Pastikan yang benar-benar jalan adalah SHA yang baru di-deploy.
+          $SSH "test \"\$(cat ${ROOT}/current/.release-sha)\" = '${RELEASE_SHA}' || { echo 'ERROR: .release-sha tidak cocok' >&2; exit 1; }"
+
+          # Supaya PM2 hidup lagi setelah reboot VPS.
+          $SSH "pm2 save"
+
+          # Buang release lama supaya disk 20 GB tidak penuh. `current` dan
+          # 4 release terbaru selalu dipertahankan.
+          $SSH "cd ${ROOT}/releases && ls -1dt */ 2>/dev/null | tail -n +6 | xargs -r rm -rf"
+
+          $SSH "pm2 status cepatcatat; echo '---'; readlink -f ${ROOT}/current"

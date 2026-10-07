@@ -1,0 +1,37 @@
+# Konversi line ending dipatok eksplisit karena repo ini di-checkout di Windows
+# (core.autocrlf=true).
+#
+# Kenapa ini penting, bukan sekadar kerapian: script .sh yang ter-checkout dengan
+# CRLF akan gagal saat dijalankan di Linux dengan galat yang menyesatkan seperti
+# `$'\r': command not found` -- dan kalau gangguannya di dalam here-doc, gejalanya
+# justru data yang terpotong di tengah. Both scripts ini dijalankan CI
+# (scripts/prepare-deploy.sh) dan di server (scripts/bootstrap-vps.sh), jadi satu
+# karakter CR yang salah sudah cukup untuk menggagalkan deploy.
+#
+# Blob di repository tetap LF. Aturan ini memastikan checkout di Windows juga
+# menghasilkan LF, jadi mengedit script dari laptop tidak merusak file.
+
+*.sh text eol=lf
+
+# File tanpa ekstensi yang dieksekusi juga perlu aturan sama (server.js di dalam
+# standalone sudah berada di luar git, tapi aturan ini berlaku untuk skrip lain
+# yang mungkin menyusul).
+*.bash text eol=lf
+
+# Next.js dan tooling-nya menghasilkan banyak file teks; aturan ini mencegah
+# diff penuh noise akibat konversi CRLF.
+*.json text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.sql text eol=lf
+
+# Aset biner: jangan pernah disentuh penyesuaian line ending.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

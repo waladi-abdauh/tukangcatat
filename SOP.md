@@ -2,6 +2,11 @@
 
 Panduan menghidupkan kembali project dari nol (setelah laptop restart, atau lama tidak dibuka), lengkap dengan peta hubungan antar komponen.
 
+> **Catatan status.** Dokumen ini ditulis ketika aplikasi masih jalan lokal
+> lewat tunnel Cloudflare. Produksi sekarang permanen di VPS dengan domain
+> `tukangcatat.com` — lihat section 6. Bagian tunnel (section 2 dan 3) hanya
+> relevan untuk **development lokal**, bukan untuk memakai bot di produksi.
+
 ---
 
 ## 1. Peta sistem (siapa ngapain)
@@ -47,7 +52,10 @@ HP kamu → buka link https://<URL-tunnel>/dash?token=... (magic link dari bot)
 
 ---
 
-## 2. SOP Start (setelah laptop restart) — urutan wajib
+## 2. SOP Start (DEVELOPMENT LOKAL, setelah laptop restart) — urutan wajib
+
+> Untuk memakai bot di produksi, JANGAN pakai bagian ini: yang berjalan adalah
+> VPS (section 6). Tunnel ini hanya untuk ngoprek tanpa menyentuh produksi.
 
 ### Terminal A — tunnel
 ```powershell
@@ -238,8 +246,7 @@ abu-abukan, jalankan SQL-nya.
 
 ### Kalau nomor kena blok
 
-1. 
-pm run verify:guard - pastikan kill switch benar-benar aktif.
+1. Jalankan `npm run verify:guard` — pastikan kill switch benar-benar aktif.
 2. Cek `gateway_health` di Supabase: `status`, `detail`, `blocked_at`.
 3. **Jangan** langsung restart app untuk "mencoba lagi" — itu menambah
    tekanan ke device yang sedang bermasalah.
@@ -257,9 +264,9 @@ Jadwalkan tiap 15 menit dengan header `Authorization: Bearer CRON_SECRET`:
 GET /api/cron/gateway-health
 ```
 
-Sistem ini **khusus Fonnte/Wablas** - sudah ada endpoint device info
-device info Wablas. Kalau pindah ke gateway lain, `checkDeviceHealth` perlu
-diisi ulang.
+Sistem ini **khusus Fonnte/Wablas** — sudah ada endpoint device info Wablas
+(`lib/wa/device-status.ts`). Kalau pindah ke gateway lain, `checkDeviceHealth`
+perlu diisi ulang.
 
 ### Produksi: PM2 `instances: 1` BUKAN OPSI
 
@@ -283,6 +290,75 @@ antrean + counter terpusat (Redis/Postgres) **dan** redesign
 ---
 
 ## 6. Deploy produksi (CI + VPS)
+
+Produksi permanen ada di VPS (`202.155.95.43`) dengan domain
+`tukangcatat.com`. Tidak ada tunnel, tidak ada laptop yang harus menyala: begitu
+deploy selesai, bot jalan terus sampai VPS-nya di-reboot.
+
+```
+Internet
+  │  HTTPS
+  ▼
+Cloudflare (proxy oranye, DNS diCF)     ← proteksi DDoS, IP asli VPS tertutup
+  │
+  ▼
+Caddy :443  (/etc/caddy/Caddyfile)      ← sertifikat TLS, security headers
+  │  http://127.0.0.1:3000              ← loopback saja, port 3000 TIDAK dibuka
+  ▼
+Next.js standalone  ← PM2, instances: 1, fork mode
+```
+
+### Bootstrap VPS (sekali saja)
+
+```bash
+ssh root@202.155.95.43
+curl -fsSL https://raw.githubusercontent.com/waladi-abdauh/tukangcatat/master/scripts/bootstrap-vps.sh | bash
+```
+
+Idempotent, jadi aman dijalankan ulang. Yang dikerjakan: swap 2 GB, firewall
+`ufw` (hanya 22/80/443), user `deploy`, Node 24, PM2 + `pm2-logrotate`, rsync,
+dan Caddy. Yang **tidak** dikerjakan (karena butuh nilai yang hanya kamu punya):
+isi `shared/.env`, `Caddyfile`, public key GitHub, dan `pm2 startup`.
+
+Langkah manual sisanya ada di bagian `MANUAL` yang dicetak script tersebut.
+
+### DNS
+
+Domain dibeli di DomaiNesia, DNS dikelola di Cloudflare:
+
+| Jenis | Nama | Nilai | Proxy |
+|---|---|---|---|
+| A | `@` | `202.155.95.43` | Abu dulu, nyalakan oranye nanti |
+| CNAME | `www` | `tukangcatat.com` | Abu dulu |
+
+Nameserver di Domain Manager Cloudflare harus diganti ke dua nameserver yang
+diberikan Cloudflare saat mendaftarkan domain. Propagasi bisa 1–24 jam.
+
+**Kenapa proxy oranye dinyalakan belakangan, bukan sekarang:** dengan SSL mode
+Full (strict), Cloudflare oranye + Caddy yang belum punya sertifikat = error
+526. Dan yang lebih penting: kalau webhook kena bot challenge sebelum sempat
+diuji, pesan WA hilang tanpa jejak karena baris dedupe sudah diklaim begitu
+payload masuk.
+
+Setelah deploy pertama sukses dan alur pesan terbukti jalan:
+
+1. Cloudflare → **SSL/TLS → Full (strict)**
+2. Cloudflare → **Rules → WAF Custom Rules**: `Skip` semua aksi untuk
+   `http.request.uri.path starts_with "/api/webhook/whatsapp"` — kalau tidak,
+   POST dari Wablas bisa dibalas halaman challenge dan inbound mati diam-diam.
+3. Cloudflare → DNS → nyalakan oranye pada kedua record
+
+### Secret runtime
+
+`/opt/cepatcatat/shared/.env` (mode `600`, pemilik `deploy`) adalah satu-satunya
+tempat secret produksi. Workflow tidak pernah menyalinnya; yang dilakukan hanya
+membuat symlink `releases/<sha>/.env` → `shared/.env`, karena Next memuat
+`.env` dari `process.cwd()`.
+
+Isinya **seluruh** isi `.env.local` lokal kecuali `NEXT_PUBLIC_*` — nilai itu
+di-inline saat build di GitHub, jadi versi di server tidak mempengaruhi apa pun.
+
+### Alur CI
 
 Alurnya: push ke `master` → `verify` (tsc + lint + build + rakit paket) →
 **berhenti di situ**. Tidak ada yang menyentuh server. Untuk benar-benar
@@ -351,7 +427,7 @@ Selesai. Tidak perlu approve apa pun.
 ### Rollback
 
 ```bash
-ssh deploy@<ip>
+ssh deploy@202.155.95.43
 cd /opt/cepatcatat
 ls -1dt releases/*/ | head            # cari SHA target
 ln -sfn releases/<sha-target> current.tmp && mv -T current.tmp current
@@ -373,33 +449,57 @@ dan `journalctl -u caddy -n 50`, lalu rollback seperti di atas.
 sesi login. Supaya app hidup setelah reboot:
 
 ```bash
-pm2 startup      # jalankan perintah yang dicetak, lalu pm2 save
+pm2 startup systemd -u deploy --hp /home/deploy   # jalankan sebagai root, sekali saja
 ```
 
 ### Rotasi secret
 
-`WA_WEBHOOK_SECRET_TOKEN`, token Wablas, dan `GEMINI_API_KEY` pernah tampil
-di chat. Rotasi **wajib** sebelum webhook publik aktif:
+`WA_WEBHOOK_SECRET_TOKEN`, token dan secret Wablas, `GEMINI_API_KEY`, serta
+`VAPID_PRIVATE_KEY` pernah tampil di chat atau output inspeksi. Rotasi **wajib**
+sebelum webhook publik aktif:
 
 1. Tulis nilai baru di `/opt/cepatcatat/shared/.env`.
 2. Update `?key=` di dashboard gateway (Wablas/Fonnte).
 3. Kalau `NEXT_PUBLIC_APP_URL` berubah, itu **perlu rebuild** — nilainya
    di-inline saat build, restart tidak cukup.
 
+`WA_WEBHOOK_SECRET_TOKEN` tidak punya masa berlaku, jadi kalau bocor satu kali
+permintaan lama yang webhook-nya masih mengarah ke `?key=` lamakan akan terus
+diterima selamanya. Rotasi menutupnya.
+
 Secret runtime di GitHub: **Settings > Secrets and variables > Actions**,
 tab **Repository secrets** (BUKAN environment secret — lihat catatan di atas).
 Variabel `NEXT_PUBLIC_*` pakai tab **Variables** juga di level repository
 (nilainya publik dan memang di-inline ke bundle browser).
 
+Yang perlu diisi di GitHub, dan tidak lebih dari itu:
+
+| Jenis | Nama | Keterangan |
+|---|---|---|
+| Variable | `NEXT_PUBLIC_APP_URL` | `https://tukangcatat.com` — wajib sama persis dengan `Caddyfile` |
+| Variable | `NEXT_PUBLIC_SUPABASE_URL` | Aman dipublikasikan |
+| Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Aman; RLS aktif di semua tabel |
+| Variable | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Aman dipublikasikan |
+| Secret | `VPS_HOST` | `202.155.95.43` |
+| Secret | `VPS_USER` | `deploy` |
+| Secret | `VPS_PORT` | `22` |
+| Secret | `VPS_SSH_KEY` | Private key deploy khusus — **bukan** key pribadi kamu |
+| Secret | `VPS_KNOWN_HOSTS` | Output `ssh-keyscan -p 22 202.155.95.43` |
+
+`SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, token WA, `GEMINI_API_KEY`,
+dan `JWT_SECRET_KEY` **tidak pernah** masuk GitHub — semuanya hanya di
+`shared/.env` di server.
+
 ---
 
-## 7. Referensi `.env.local` (mana yang dipakai untuk apa)
+## 7. Referensi env (mana yang dipakai untuk apa)
 
-Semua ada di `.env.local` (sudah terisi). Template lengkap di `.env.local.example`.
+Semua ada di `.env.local` (dev) dan `/opt/cepatcatat/shared/.env` (produksi).
+Template lengkap di `.env.local.example`.
 
-| Variable | Dipakai untuk | Perlu update tiap tunnel ganti? |
+| Variable | Dipakai untuk | Di produksi nilainya |
 |---|---|---|
-| `NEXT_PUBLIC_APP_URL` | Basis magic link yang dikirim bot | **Ya** (diisi URL tunnel baru) |
+| `NEXT_PUBLIC_APP_URL` | Basis magic link yang dikirim bot | `https://tukangcatat.com` (di-inline saat build, dari GitHub Variable) |
 | `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Akses database | Tidak |
 | `GEMINI_API_KEY` (+ `GEMINI_MODEL`) | Parse AI (teks/suara/foto) | Tidak |
 | `WA_GATEWAY` | Gateway aktif: `fonnte` atau `wablas` | Ya (saat cutover) |

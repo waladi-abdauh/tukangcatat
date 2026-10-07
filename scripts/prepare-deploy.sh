@@ -3,8 +3,8 @@
 # Menyusun paket deploy yang self-contained.
 #
 # `next build` dengan `output: "standalone"` (lihat next.config.ts) sudah
-# menulis .next/standalone/ berisi server.js + salinan node_modules yang benar
-#-benar dipakai route kita. Dua folder TIDAK ikut otomatis dan harus disalin
+# menulis .next/standalone/ berisi server.js + salinan node_modules yang benar-
+# benar dipakai route kita. Dua folder TIDAK ikut otomatis dan harus disalin
 # manual. Kalau dilewatkan, gejalanya baru muncul saat production: server.js
 # tetap jalan, tapi halaman dashboard gagal load asset.
 #
@@ -60,7 +60,7 @@ fi
 
 # Penanda release aktif di server. Berguna dua hal: smoke test bisa memastikan
 # artifact yang jalan adalah SHA yang diharapkan, dan `ls -l current` langsung
-# memberi tahu sedang circulardeploy commit mana.
+# memberi tahu sedang circulasi commit mana.
 SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 printf '%s\n' "$SHA" > "$OUT/.release-sha"
 

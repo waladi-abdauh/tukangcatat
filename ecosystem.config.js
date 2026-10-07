@@ -1,14 +1,17 @@
 // Konfigurasi PM2 untuk produksi (Node + PM2 di VPS, bukan Vercel).
 //
-// Jalankan:  npx pm2 start ecosystem.config.js
-//           npx pm2 reload ecosystem.config.js --update-env
+// Jalankan:  npx pm2 startOrRestart ecosystem.config.js --update-env
 //           npx pm2 logs cepatcatat
+//
+// JANGAN `pm2 reload`: di `fork` mode reload jatuh ke perilaku restart anyway
+// (lihat catatan kill_timeout di bawah), jadi kita lebih baik pakai
+// `startOrRestart` yang jujur soal downtime singkatnya.
 //
 // ===== Kenapa `next build` TIDAK jalan di server =====
 //
 // next.config.ts mengaktifkan `output: "standalone"`, jadi `next build`
-// menulis .next/standalone/ berisi server.js + hanya node_modules yang benar
-// -benar dipakai route kita. scripts/prepare-deploy.sh merakitnya jadi satu
+// menulis .next/standalone/ berisi server.js + hanya node_modules yang benar-
+// benar dipakai route kita. scripts/prepare-deploy.sh merakitnya jadi satu
 // folder `release/` (ditambah public/ dan .next/static/ yang tidak ikut
 // otomatis). Akibatnya di server tidak ada `npm ci`, tidak ada `next build`,
 // dan tidak ada toolchain dev -- inilah yang membuat VPS 1 GB cukup.
@@ -32,6 +35,7 @@
 // Scale naik? Naikkan vertically (RAM) dulu. Horizontal scaling butuh
 // antrean + counter terpusat (Redis/Postgres) plus redesign lib/wa/policy.ts
 // supaya tidak memakai counter in-process sama sekali.
+//
 // `current` adalah symlink ke releases/<sha>. PM2 me-restart process otomatis
 // setiap kali GitHub Actions menukar symlink itu, sehingga kita SELALU dapat
 // drain penuh (lihat kill_timeout di bawah) tanpa menimpa file yang sedang
@@ -60,7 +64,6 @@ module.exports = {
       max_memory_restart: "700M",
 
 // ===== Drain: baris paling penting di file ini =====
-      //
       // PM2 mengirim SIGINT lalu MENUNGGU sebanyak kill_timeout ms sebelum
       // SIGKILL. Default PM2 hanya 1600ms -- jauh tidak cukup.
       //
@@ -103,7 +106,19 @@ module.exports = {
         HOSTNAME: "127.0.0.1",
       },
 
-      // Log dirotasi harian supaya tidak memenuhi disk 1 GiB.
+      // Log dirotasi oleh modul pm2-logrotate (dipasang di bootstrap VPS).
+      //
+      // Kenapa path-nya eksplisit: tanpa out_file/error_file, PM2 menaruh log
+      // di ~/.pm2/logs/ dengan nama app-out.log / app-error.log yang tidak
+      // pernah dipangkas. Di disk 20 GB yang sebagian besar sudah dipakai image
+      // dan swap, log yang tumbuh tanpa batas jauh lebih berbahaya daripada
+      // folder release (satu release cuma ~24 MB, dan kita prune ke 5
+      // terakhir).
+      //
+      // `merge_logs` menggabungkan stdout dan stderr ke satu berkas per
+      // aplikasi supaya rotasinya cukup satu set, bukan dua.
+      out_file: "/home/deploy/.pm2/logs/cepatcatat-out.log",
+      error_file: "/home/deploy/.pm2/logs/cepatcatat-error.log",
       merge_logs: true,
       time: true,
     },

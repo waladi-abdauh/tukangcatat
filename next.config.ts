@@ -15,12 +15,29 @@ const nextConfig: NextConfig = {
   // Tracing file output juga dipatok ke root proyek. Tanpa ini Next memakai
   // layout monorepo dan file di luar app/ bisa ikut ter-trace atau terlewat.
   outputFileTracingRoot: path.join(__dirname),
-  // Akses dashboard lewat tunnel Cloudflare (dev) harus diizinkan, skor
-  // Origin berbeda dari localhost.
-  allowedDevOrigins: ["*.trycloudflare.com"],
+  // Akses dashboard harus melewati pemeriksaan Origin pada Server Actions.
+  // Kalau hostname produksi tidak ada di daftar ini, login / rename kategori /
+  // hapus budget akan gagal dengan 403 padahal halaman dashboard-nya sendiri
+  // terbuka normal - gejalanya sangat menyesatkan karena tidak ada hint sama
+  // sekali bahwa masalahnya allowlist Origin.
+  //
+  // Entries produksi ditambahkan TANPA wildcard sengaja: hanya domain yang
+  // benar-benar kita kendalikan boleh memanggil Server Actions kita. Wildcard
+  // `*` di sini berarti situs mana pun bisa membuat browser user mengirim
+  // request_actions ke server kita, dan cookie sesi ikut dibawa.
+  allowedDevOrigins: [
+    "*.trycloudflare.com",
+    "tukangcatat.com",
+    "www.tukangcatat.com",
+  ],
   experimental: {
     serverActions: {
-      allowedOrigins: ["*.trycloudflare.com"],
+      allowedOrigins: [
+        "tukangcatat.com",
+        "www.tukangcatat.com",
+        // Dipakai hanya saat pengembangan lokal lewat tunnel Cloudflare.
+        "*.trycloudflare.com",
+      ],
     },
   },
   // Service worker harus selalu dicek ulang browser (jangan kena HTTP cache)

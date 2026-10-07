@@ -1,0 +1,87 @@
+# Caddyfile - reverse proxy produksi CepatCatat.
+#
+# Dipakai DI SERVER (/etc/caddy/Caddyfile), bukan dijalankan dari repo. File ini
+# disimpan di repo supaya perubahannya ikut ter-version-control dan bisa
+# di-review sebelum dikirim. Yang dipakai server hanya salinannya.
+#
+# Jalur trafik di server:
+#   internet -> Cloudflare (proxy oranye) -> Caddy :443 -> Next.js 127.0.0.1:3000
+#
+# Port 3000 SENGAJA tidak dibuka ke publik. PM2 bind ke loopback (lihat
+# HOSTNAME di ecosystem.config.js), jadi satu-satunya jalan masuk dari internet
+# adalah Caddy yang memegang sertifikat TLS.
+
+{
+	# Ganti ke alamat email yang benar-benar kamu baca. Let's Encrypt mengirim
+	# peringatan kedaluwarsa ke sini; tanpa email, sertifikat baru kedaluwarsa
+	# hanya ketahuan saat aplikasi sudah rusak untuk user.
+	email ops@tukangcatat.com
+}
+
+# =====================================================================
+# Domain utama - APP_URL produksi.
+#
+# Harus sama persis dengan NEXT_PUBLIC_APP_URL di GitHub Variables, karena nilai
+# itu di-inline ke bundle saat build (bukan dibaca dari .env saat runtime).
+# =====================================================================
+tukangcatat.com {
+	encode zstd gzip
+
+	# proxy.ts:39 membaca header x-forwarded-proto untuk menentukan flag
+	# `secure` pada cookie ccat_session. Kalau nilainya salah (mis. "http"),
+	# cookie tetap terkirim tanpa flag secure dan login dashboard gagal
+	# diam-diam di browser yang memakai HTTPS.
+	#
+	# Kita set eksplisit alih-alih bergantung pada tebakan Caddy: tepat di
+	# belakang Cloudflare, nilai turunan Caddy tidak selalu benar.
+	header_up X-Forwarded-Proto https
+
+	# Host asli harus diteruskan. Next memakainya untuk membangun redirect dan
+	# untuk membandingkan Origin pada Server Actions; kalau hilang, request ke
+	# dashboard bisa gagal dengan galat 403 yang menyesatkan.
+	header_up Host {host}
+
+	# Header keamanan. HSTS 2 tahun karena ini domain produksi permanen: begitu
+	# browser meng-hang satu kali, user tidak bisa lagi membuka lewat http://
+	# dan kita bebas mematikan port 80 di masa depan.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Matikan banner Caddy supaya versi software tidak ikut terkirim ke client.
+		-Server
+	}
+
+	# Timeout respons sedikit di atas kill_timeout PM2 (30 detik, lihat
+	# ecosystem.config.js). Kalau proses lama sedang di-drain dan belum keluar
+	# sepenuhnya, Caddy masih menyodorkan request ke sana; memberi ruang
+	# beberapa detik mencegah 502 sesaat saat rollout.
+	reverse_proxy 127.0.0.1:3000 {
+		transport http {
+			response_header_timeout 35s
+		}
+	}
+
+	# Log dipotong 10 MB dan menyimpan 5 berkas. Tanpa ini, PM2 dan Caddy akan
+	# mengisi disk 20 GB jauh sebelum folder release jadi masalah: satu release
+	# hanya sekitar 24 MB, sedangkan log tumbuh tanpa batas.
+	log {
+		output file /var/log/caddy/tukangcatat.log {
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 720h
+		}
+	}
+}
+
+# =====================================================================
+# www -> apex (301 permanen)
+#
+# Harus punya ServeBlock sendiri, bukan `redir` di dalam blok apex. Caddy
+# memilih site block paling spesifik, jadi www tidak akan ikut ter-redirect
+# bila Aturannya hanya ditulis di blok domain utama.
+# =====================================================================
+www.tukangcatat.com {
+	redir https://tukangcatat.com{uri} permanent
+}

@@ -37,7 +37,13 @@ export async function fetchWablasDeviceStatus(): Promise<DeviceStatus> {
     signal: AbortSignal.timeout(getGatewayTimeoutMs()),
   });
 
-  const body = (await res.text().catch(() => "")).slice(0, 300);
+  // Body PENUH dipakai untuk parse; yang dipotong (untuk pesan error & field
+  // `raw`) hanya salinan agar log tidak kebanjiran. Jangan memotong SEBELUM
+  // parse: payload Wablas kini bisa > 300 karakter (mis. quota "unlimited",
+  // daftar field bertambah) sehingga JSON.parse atas body terpotong selalu
+  // gagal dan health-check buta.
+  const text = await res.text().catch(() => "");
+  const body = text.slice(0, 300);
   if (!res.ok) {
     throw new Error(`device/info gagal (${res.status}): ${body}`);
   }
@@ -47,7 +53,7 @@ export async function fetchWablasDeviceStatus(): Promise<DeviceStatus> {
   // `parsed.data` jadi error, padahal jalur catch selalu throw.
   let parsed: { status?: unknown; data?: Record<string, unknown> };
   try {
-    parsed = JSON.parse(body) as typeof parsed;
+    parsed = JSON.parse(text) as typeof parsed;
   } catch {
     throw new Error(`device/info balasan bukan JSON: ${body}`);
   }

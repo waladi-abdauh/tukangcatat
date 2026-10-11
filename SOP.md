@@ -1,5 +1,9 @@
 # SOP CepatCatat — Start & Resume
 
+> **Owner baru mulai dari sini:** untuk gambaran singkat cara kerja sistem
+> (dev vs prod, commit, deploy, rollback, troubleshooting "bot tidak membalas"),
+> baca dulu **`CARA-KERJA.md`**. Dokumen ini (SOP) untuk langkah teknis mendetail.
+
 Panduan menghidupkan kembali project dari nol (setelah laptop restart, atau lama tidak dibuka), lengkap dengan peta hubungan antar komponen.
 
 > **Catatan status.** Dokumen ini ditulis ketika aplikasi masih jalan lokal

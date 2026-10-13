@@ -296,15 +296,21 @@ LANGKAH MANUAL YANG MASIH HARUS DIKERJAKAN
 
 6. Cron (setelah deploy pertama berhasil)
 
-     crontab -u deploy -e
+   crontab tidak mewarisi env dari shell, jadi CRON_SECRET tidak tersedia
+   kalau curl ditulis langsung. Pakai wrapper script dari repo yang meng-
+   source /opt/cepatcatat/shared/.env dulu.
 
-   Isi:
-     */15 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/gateway-health
-     */15 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/push-reminder
+   Salin wrapper (jalankan sebagai deploy):
+     install -m 755 /opt/cepatcatat/current/scripts/cron/gateway-health-cron.sh /opt/cepatcatat/
+     install -m 755 /opt/cepatcatat/current/scripts/cron/push-reminder-cron.sh /opt/cepatcatat/
+
+   Lalu crontab -u deploy -e, isi:
+     */15 * * * * /opt/cepatcatat/gateway-health-cron.sh >> /home/deploy/gateway-health.log 2>&1
+     */15 * * * * /opt/cepatcatat/push-reminder-cron.sh >> /home/deploy/push-reminder.log 2>&1
      30 3 * * * cd /opt/cepatcatat/current && node scripts/maintenance/cleanup.mts
 
-   curl tidak punya akses ke CRON_SECRET dari crontab secara default --
-   pakai wrapper script yang me-export env-nya, atau simpan di /etc/environment.
+   Catatan: wrapper TIDAK ikut otomatis saat deploy (bukan bagian release),
+   jadi setelah menambah/mengubah wrapper, salin ulang ke /opt/cepatcatat/.
 
 =================================================================
 Domain harus SUDAH resolve ke IP VPS sebelum Caddy bisa ambil sertifikat.

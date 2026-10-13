@@ -178,16 +178,28 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 GRANT SELECT ON profiles, monthly_budgets, category_budgets, transactions, payments, referrals, push_subscriptions, sent_alerts TO anon, authenticated;
 
--- SEED DEFAULT CATEGORIES (bulan berjalan WIB; bulan berikutnya mewarisi)
+-- SEED DEFAULT BUDGET + CATEGORIES (bulan berjalan WIB; bulan berikutnya mewarisi)
+-- Total plafon 3.150.000 dari budget 3.500.000 => cadangan 350.000 (10%) supaya
+-- ringkasan "Cadangan" di Settings langsung hijau untuk user baru.
 CREATE OR REPLACE FUNCTION seed_default_categories(target_user_id UUID)
 RETURNS VOID AS $$
+DECLARE
+  cur_month TEXT := to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM');
 BEGIN
   INSERT INTO category_budgets (user_id, category_name, limit_amount, month) VALUES
-    (target_user_id, 'Dapur', 1200000, to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')),
-    (target_user_id, 'Makan', 600000, to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')),
-    (target_user_id, 'Transport', 600000, to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')),
-    (target_user_id, 'Leisure', 600000, to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')),
-    (target_user_id, 'Tagihan', 600000, to_char(now() AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM'))
+    (target_user_id, 'Dapur', 1150000, cur_month),
+    (target_user_id, 'Belanja', 450000, cur_month),
+    (target_user_id, 'Tagihan', 450000, cur_month),
+    (target_user_id, 'Makan', 400000, cur_month),
+    (target_user_id, 'Transport', 400000, cur_month),
+    (target_user_id, 'Kesehatan', 150000, cur_month),
+    (target_user_id, 'Hiburan', 150000, cur_month)
+  ON CONFLICT DO NOTHING;
+
+  -- Budget bulanan ditanam eksplisit supaya tidak bergantung fallback
+  -- DEFAULT_MONTHLY_BUDGET (memisahkan default seed dari fallback resolver).
+  INSERT INTO monthly_budgets (user_id, month, amount) VALUES
+    (target_user_id, cur_month, 3500000)
   ON CONFLICT DO NOTHING;
 END;
 $$ LANGUAGE plpgsql;

@@ -5,8 +5,9 @@
 export const APP_NAME = "TukangCatat";
 
 // Budget default bila user belum pernah mengisi monthly_budgets
-// (fallback resolver budget per-periode).
-export const DEFAULT_MONTHLY_BUDGET = 3_000_000;
+// (fallback resolver budget per-periode). User baru tetap mendapat baris
+// monthly_budgets eksplisit dari seed; ini hanya jaring pengaman resolver.
+export const DEFAULT_MONTHLY_BUDGET = 3_500_000;
 
 // Harga langganan PRO bulanan (rupiah).
 export const PRO_PRICE = 21_000;

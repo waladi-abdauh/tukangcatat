@@ -123,12 +123,13 @@ function formatMoney(n: number): string {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Makan: "var(--chart-1)",
-  Transport: "var(--chart-2)",
-  Belanja: "var(--chart-3)",
-  Tagihan: "var(--chart-4)",
-  Kesehatan: "var(--chart-5)",
-  Hiburan: "#94a3b8",
+  Dapur: "var(--chart-1)",
+  Belanja: "var(--chart-2)",
+  Tagihan: "var(--chart-3)",
+  Makan: "var(--chart-4)",
+  Transport: "var(--chart-5)",
+  Kesehatan: "var(--chart-6)",
+  Hiburan: "var(--chart-7)",
 };
 
 function categoryColor(name: string): string {

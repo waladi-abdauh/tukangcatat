@@ -22,9 +22,9 @@ const PALETTE = [
   "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
   "#94a3b8",
-  "#a78bfa",
-  "#f472b6",
 ];
 
 interface CategoryPieChartProps {

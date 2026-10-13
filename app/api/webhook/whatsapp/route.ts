@@ -410,7 +410,7 @@ async function getUserCategories(db: DBC, userId: string): Promise<string[]> {
   }
   set.delete("Lainnya");
   if (set.size === 0) {
-    return ["Dapur", "Makan", "Transport", "Leisure", "Tagihan", "Lainnya"];
+    return ["Dapur", "Belanja", "Tagihan", "Makan", "Transport", "Kesehatan", "Hiburan", "Lainnya"];
   }
   return [...set, "Lainnya"];
 }

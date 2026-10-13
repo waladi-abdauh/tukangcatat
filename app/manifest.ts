@@ -22,6 +22,13 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "any",
+      },
+      {
+        // Versi dengan padding ekstra supaya tidak terpotong mask bulat Android.
+        src: "/icons/icon-maskable-512.png",
+        sizes: "512x512",
+        type: "image/png",
         purpose: "maskable",
       },
     ],

@@ -38,6 +38,7 @@ import { formatIDR } from "../../lib/utils";
 import {
   FREE_DAILY_TRANSACTION_LIMIT,
   PRO_DAILY_TRANSACTION_LIMIT,
+  PRO_ENABLED,
   REFERREE_DISCOUNT_PCT,
   REFERRER_REWARD_AMOUNT,
 } from "../../lib/constants";
@@ -578,6 +579,12 @@ export default function SettingsClient({
           <p className="text-sm text-muted-foreground">
             Teman dapat potongan {Math.round(REFERREE_DISCOUNT_PCT * 100)}% pas bayar PRO pertama. Kamu: potongan {formatIDR(REFERRER_REWARD_AMOUNT)} buat PRO berikutnya.
           </p>
+          {!PRO_ENABLED && (
+            <p className="text-xs text-muted-foreground">
+              Kode tetap bisa dibagikan sekarang — hadiahnya cair begitu paket
+              PRO dibuka. 🎁
+            </p>
+          )}
 
           <button
             type="button"
@@ -662,6 +669,12 @@ export default function SettingsClient({
               ? `PRO — ${PRO_DAILY_TRANSACTION_LIMIT} catatan via WA/hari · Voice & Struk tanpa batas · catat manual di dashboard tanpa batas. 🎉`
               : `GRATIS — ${FREE_DAILY_TRANSACTION_LIMIT} catatan via WA/hari · catat manual di dashboard tanpa batas.`}
           </p>
+          {!PRO_ENABLED && !isPro && (
+            <p className="text-xs text-muted-foreground">
+              Paket PRO (voice note, scan struk, catatan lebih banyak) masih
+              disiapkan — nantikan ya. ✨
+            </p>
+          )}
         </CardContent>
       </Card>
       </section>

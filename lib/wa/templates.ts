@@ -6,6 +6,7 @@
 // bisa terpicu massal (onboarding, referral, limit) wajib punya beberapa
 // varian, bukan satu string tetap. Varian dipilih acak per pengiriman.
 import { formatIDR } from "../utils";
+import { REFERRER_REWARD_AMOUNT } from "../constants";
 
 // Pilih frasa acak dari pool.
 export const pick = <T,>(variants: readonly T[]): T =>
@@ -55,9 +56,9 @@ export const transactionsSavedTemplate = (
 // 2. Fitur PRO terkunci (voice/scan struk untuk akun gratis).
 export const featureLockedTemplate = () =>
   pick([
-    `🔒 Voice Note & Scan Struk khusus PRO.\n\nCatat lewat teks & dashboard tetap gratis kok! Mau bicara/foto struk? Ketik *!bayar* ya ✨`,
-    `🔒 Bicara & foto struk itu fitur PRO, Kak.\n\nSementara teks & dashboard bebas dipakai — ketik *!bayar* kalau mau naik kelas ✨`,
-    `🔒 Fitur suara & scan struk belum termasuk paket gratis.\n\nUpgrade PRO biar bisa — ketik *!bayar*, makannya nggak mahal 😄`,
+    `🔒 Voice Note & Scan Struk masih disiapkan buat paket PRO ya.\n\nCatat lewat teks & dashboard tetap gratis kok — nantikan fitur barunya ✨`,
+    `🔒 Bicara & foto struk itu fitur PRO yang belum dibuka, Kak.\n\nSementara teks & dashboard bebas dipakai — nanti aku kabari begitu aktif ✨`,
+    `🔒 Fitur suara & scan struk belum termasuk paket gratis.\n\nCatat pakai teks dulu ya, fitur PRO-nya segera hadir 😄`,
   ]);
 
 // 4. Onboarding user baru.
@@ -74,7 +75,7 @@ export const onboardingTemplate = () =>
       `Perintah cepat:\n` +
       `• *!dashboard* → buka panel keuangan\n` +
       `• *!referal* → lihat kode & undang teman\n` +
-      `• *!bayar* → upgrade PRO\n` +
+      `• *!bayar* → info paket PRO\n` +
       `• *!bantuan* → ulang pesan ini\n\n` +
       `Coba sekarang: ketik *"Bensin 50rb"*. 🚀`,
 
@@ -86,11 +87,11 @@ export const onboardingTemplate = () =>
       `Perintah cepat:\n` +
       `• *!dashboard* → panel keuangan kamu\n` +
       `• *!referal* → lihat kode & undang teman\n` +
-      `• *!bayar* → upgrade PRO\n` +
+      `• *!bayar* → info paket PRO\n` +
       `• *!bantuan* → pesan ini diulang\n\n` +
       ` Yuk mulai: *"Makan siang 25rb"*. 🚀`,
 
-    `Hai! 👋 Aku *TukangCatat*, tai duit kamu biar nggak bocor.\n\n` +
+    `Hai! 👋 Aku *TukangCatat*, jaga duit kamu biar nggak bocor.\n\n` +
       `Gampang banget kok:\n` +
       `📝 *Teks*: "Bensin 50rb"\n` +
       `🎤 *Voice Note*: "kopi susu 12rb" (member PRO)\n` +
@@ -98,7 +99,7 @@ export const onboardingTemplate = () =>
       `Perintah cepat:\n` +
       `• *!dashboard* → lihat rekap kamu\n` +
       `• *!referal* → kode & undang teman\n` +
-      `• *!bayar* → upgrade PRO\n` +
+      `• *!bayar* → info paket PRO\n` +
       `• *!bantuan* → ulang pesan ini\n\n` +
       `Coba sekarang, ketik: *"Ojek 15rb"*. 🚀`,
   ]);
@@ -116,17 +117,17 @@ export const referalInfoTemplate = (code: string) =>
   pick([
     `🎁 *Kode Referal Kamu:* ${code}\n\nKasih kode ini ke teman. Tiap teman kamu aktif bayar PRO:\n` +
       `• Teman dapat potongan 20% pas bayar PRO pertama\n` +
-      `• Kamu dapat kredit ${formatIDR(4750)}, cair saat settlement (cap 2 bulan).\n\n` +
+      `• Kamu dapat kredit ${formatIDR(REFERRER_REWARD_AMOUNT)}, cair saat settlement (cap 2 bulan).\n\n` +
       `Cara pakai: teman ketik *"REF ${code}"* saat pertama chat.`,
 
     `🎁 Kode kamu: *${code}*\n\nBagikan ke teman, tiap teman yang aktif bayar PRO:\n` +
       `• Potongan 20% untuk bayar PRO pertamanya\n` +
-      `• Kredit ${formatIDR(4750)} buat kamu, cair saat settlement (cap 2 bulan).\n\n` +
+      `• Kredit ${formatIDR(REFERRER_REWARD_AMOUNT)} buat kamu, cair saat settlement (cap 2 bulan).\n\n` +
       `Teman cukup ketik *"REF ${code}"* di chat pertamanya.`,
 
     `🎁 Kode referal: *${code}*\n\nKasih ke teman yang mau coba TukangCatat:\n` +
       `• Mereka hemat 20% dari PRO pertama\n` +
-      `• Kamu dapat kredit ${formatIDR(4750)} (cap 2 bulan).\n\n` +
+      `• Kamu dapat kredit ${formatIDR(REFERRER_REWARD_AMOUNT)} (cap 2 bulan).\n\n` +
       `Cara pakai: teman ketik *"REF ${code}"* waktu pertama chat.`,
   ]);
 
@@ -159,11 +160,11 @@ export const dailyLimitReachedTemplate = (
 ) =>
   pick([
     `✋ Catatan "${preview}" nggak kecatat ya — limit via WA hari ini udah penuh (${limit}/${limit}).\n\n` +
-      `Catat manual di dashboard bebas batas ✍️ atau ketik *!bayar* naik PRO (${proLimit}/hari + voice & struk).`,
+      `Catat manual di dashboard bebas batas ✍️ Paket PRO (${proLimit}/hari + voice & struk) segera hadir ya.`,
     `✋ "${preview}" belum kebaca nih — jatah catatan WA hari ini sudah habis (${limit}/${limit}).\n\n` +
-      `Bisa dicatat manual di dashboard tanpa batas ✍️, atau ketik *!bayar* buat PRO (${proLimit}/hari + voice & struk).`,
+      `Bisa dicatat manual di dashboard tanpa batas ✍️ Paket PRO (${proLimit}/hari + voice & struk) lagi disiapkan.`,
     `✋ Wah, catatan "${preview}" nggak masuk — limit WA hari ini sudah penuh (${limit}/${limit}).\n\n` +
-      `Kalau mau tanpa batas, catat manual di dashboard ✍️. Atau *!bayar* → PRO (${proLimit}/hari + voice & struk).`,
+      `Catat manual di dashboard tanpa batas ✍️ Paket PRO (${proLimit}/hari + voice & struk) segera hadir.`,
   ]);
 
 // 9a-2. Jatah pemanggilan AI habis (beda dari jatah catatan: pesan yang
@@ -173,13 +174,13 @@ export const aiLimitReachedTemplate = (limit: number, preview: string) =>
   pick([
     `😮‍💨 Jatah baca hari ini habis kak, "${preview}" belum sempat kubaca.\n\n` +
       `Besok pagi aku lanjut lagi ya, atau sekarang catat manual di dashboard ✍️ ` +
-      `Ketik *!bayar* kalau mau PRO (batas jauh lebih longgar).`,
+      `Paket PRO (batas jauh lebih longgar) segera hadir.`,
     `😮‍💨 Batas baca hari ini sudah tercapai, Kak. "${preview}" belum sempat diproses.\n\n` +
       `Besok pagi dilanjut lagi ya. Mau sekarang? catat manual di dashboard ✍️ ` +
-      `Atau *!bayar* buat PRO (batas jauh lebih longgar).`,
+      `Paket PRO (batas jauh lebih longgar) lagi disiapkan.`,
     `😮‍💨 Sudah habis jatah baca hari ini, "${preview}" belum kebaca.\n\n` +
       `Nanti pagi aku lanjut lagi ya. Sambil nunggu, catat manual di dashboard ✍️ ` +
-      `Ketik *!bayar* kalau mau PRO (batas jauh lebih longgar).`,
+      `Paket PRO (batas jauh lebih longgar) segera hadir.`,
   ]);
 
 // 9b. Off-topic umum (cuaca, politik, obrolan) -> redirect ramah & hemat token.

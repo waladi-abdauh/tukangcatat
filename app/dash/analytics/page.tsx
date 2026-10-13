@@ -6,6 +6,7 @@ import LeakDetectorCard from "../../../components/dash/leak-detector-card";
 import { getDashboardData, normalizeMonthKey, requireProfile } from "../../../lib/dash/data";
 import { formatIDR, recentMonthKeys } from "../../../lib/utils";
 import MonthSelector from "../../../components/dash/month-selector";
+import ReportDownload from "../../../components/dash/report-download";
 
 export default async function AnalyticsPage({
   searchParams,
@@ -28,7 +29,18 @@ export default async function AnalyticsPage({
             Komposisi pengeluaran {data.monthLabel}.
           </p>
         </div>
+        <div className="flex flex-col items-end gap-2">
           <MonthSelector selected={data.month} basePath="/dash/analytics" options={recentMonthKeys(12)} />
+          <ReportDownload
+            month={data.month}
+            monthLabel={data.monthLabel}
+            budget={data.budget}
+            spent={data.spent}
+            remaining={data.remaining}
+            categories={data.categories}
+            transactions={data.transactions}
+          />
+        </div>
       </div>
 
       <Card>

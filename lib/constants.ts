@@ -9,14 +9,19 @@ export const APP_NAME = "TukangCatat";
 export const DEFAULT_MONTHLY_BUDGET = 3_000_000;
 
 // Harga langganan PRO bulanan (rupiah).
-export const PRO_PRICE = 19_000;
+export const PRO_PRICE = 21_000;
+
+// Saklar pembayaran PRO. Selama false, semua CTA upgrade di web/WA ditutup dan
+// ditampilkan "segera hadir" (menunggu aktivasi payment gateway / QRIS).
+export const PRO_ENABLED = false;
 
 // Potongan 20% untuk referee (pengguna baru dari kode referral) => bayar 80%.
 export const REFERREE_DISCOUNT_PCT = 0.2;
 export const REFERREE_DISCOUNT_AMOUNT = Math.round(PRO_PRICE * REFERREE_DISCOUNT_PCT);
 
 // Reward kredit 25% bagi referrer ketika referee berhasil settlement.
-export const REFERRER_REWARD_AMOUNT = 4_750;
+export const REFERRER_REWARD_PCT = 0.25;
+export const REFERRER_REWARD_AMOUNT = Math.round(PRO_PRICE * REFERRER_REWARD_PCT);
 
 // Cap credit_balance maksimal agar tidak menumpuk gratis selamanya (setara 2 bulan).
 export const CREDIT_BALANCE_CAP = PRO_PRICE * 2;

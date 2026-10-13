@@ -19,6 +19,7 @@ import {
 } from "../../lib/dash/data";
 import { defaultDateInMonth, formatIDR, recentMonthKeys } from "../../lib/utils";
 import MonthSelector from "../../components/dash/month-selector";
+import ReportDownload from "../../components/dash/report-download";
 import { Marker } from "../../components/marker";
 
 export default async function DashPage({
@@ -66,7 +67,18 @@ export default async function DashPage({
             </p>
           )}
         </div>
-        <MonthSelector selected={data.month} basePath="/dash" options={recentMonthKeys(12)} />
+        <div className="flex flex-col items-end gap-2">
+          <MonthSelector selected={data.month} basePath="/dash" options={recentMonthKeys(12)} />
+          <ReportDownload
+            month={data.month}
+            monthLabel={data.monthLabel}
+            budget={data.budget}
+            spent={data.spent}
+            remaining={data.remaining}
+            categories={data.categories}
+            transactions={data.transactions}
+          />
+        </div>
       </div>
 
       {/* Seksi 1: bulan ini (total + progress + alert bocor, satu kartu) */}

@@ -8,6 +8,7 @@ import {
   Camera,
   Check,
   ChevronDown,
+  Clock,
   Gift,
   Mail,
   Mic,
@@ -21,6 +22,7 @@ import {
   CREDIT_BALANCE_CAP,
   FREE_DAILY_TRANSACTION_LIMIT,
   PRO_DAILY_TRANSACTION_LIMIT,
+  PRO_ENABLED,
   PRO_PRICE,
   REFERREE_DISCOUNT_PCT,
   REFERRER_REWARD_AMOUNT,
@@ -107,7 +109,7 @@ const FAQS: Array<{ q: string; a: string | null }> = [
   },
   {
     q: "Data keuangan saya aman?",
-    a: "Data kamu cuma dipakai buat nyatet & rekap buat kamu sendiri, nggak pernah dijual. Isi chat diproses Google Gemini (buat ngerjain catatan) & Fonnte (pintu WhatsApp), lalu tersimpan aman di Supabase. Catatan kecil: pas pakai paket GRATIS, isi chat bisa ikut dipakai Google buat perbaikan model AI — di paket PRO tidak. Rincian lengkap bisa kamu minta via nomor bantuan.",
+    a: "Data kamu cuma dipakai buat nyatet & rekap buat kamu sendiri, nggak pernah dijual. Isi chat diproses penyedia AI tepercaya (buat ngerjain catatan) & layanan pengiriman pesan WhatsApp, lalu tersimpan aman di Supabase. Catatan kecil: pas pakai paket GRATIS, isi chat bisa ikut dipakai Google buat perbaikan model AI — di paket berbayar nanti tidak. Rincian lengkap bisa kamu minta via nomor bantuan.",
   },
   {
     q: "Kalau nyesal gimana?",
@@ -363,9 +365,15 @@ export default async function Home({
             <div className="flex flex-col rounded-xl border border-primary/40 bg-brand-soft/50 p-6">
               <div className="flex items-center gap-2">
                 <h3 className="font-heading text-lg font-semibold">PRO</h3>
-                <span className="rounded-full bg-primary px-2 py-0.5 text-[0.6rem] font-semibold text-primary-foreground">
-                  PRO
-                </span>
+                {PRO_ENABLED ? (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-[0.6rem] font-semibold text-primary-foreground">
+                    PRO
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[0.6rem] font-semibold text-warn">
+                    Segera hadir
+                  </span>
+                )}
               </div>
               <p className="mt-1 text-3xl font-semibold tracking-tight">
                 {formatIDR(PRO_PRICE)}
@@ -384,22 +392,34 @@ export default async function Home({
                   </li>
                 ))}
               </ul>
-              <a
-                href={WA_START}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-              >
-                <Rocket className="size-4" />
-                Upgrade via WhatsApp
-              </a>
+              {PRO_ENABLED ? (
+                <a
+                  href={WA_START}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+                >
+                  <Rocket className="size-4" />
+                  Upgrade via WhatsApp
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className="mt-6 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-muted-foreground"
+                >
+                  <Clock className="size-4" />
+                  Segera hadir
+                </button>
+              )}
             </div>
           </div>
           <div className="mx-auto mt-7 max-w-2xl space-y-2 text-center text-sm text-muted-foreground">
             <p>
-              Mulai gratis dulu. Bayar per bulan, bebas berhenti kapan aja —
-              nggak ada auto-debit. Setelah periode berjalan selesai, kamu
-              balik ke paket gratis.
+              Mulai gratis dulu, tanpa syarat. Paket PRO masih disiapkan —
+              nantikan ya. Kalau sudah aktif: bayar per bulan, bebas berhenti
+              kapan aja, dan nggak ada auto-debit.
             </p>
             <p className="mt-2 text-center text-sm text-muted-foreground">
               Akun & data kamu tetap milik kamu, dan kalau mau dihapus cukup

@@ -35,7 +35,7 @@ import { formatIDR } from "../lib/utils";
 const BOT_WA = "6285773365200";
 const SUPPORT_EMAIL = "catattukang@gmail.com";
 const WA_START = `https://wa.me/${BOT_WA}?text=${encodeURIComponent(
-  "Halo TukangCatat, mau mulai nyatet?"
+  "Hai TukangCatat, aku mau mulai nyatet pengeluaran 👋"
 )}`;
 // Link pulih sesi: buka chat bot dengan pesan !dashboard sudah terisi.
 const WA_DASH = `https://wa.me/${BOT_WA}?text=${encodeURIComponent("!dashboard")}`;
@@ -53,7 +53,7 @@ const MAILTO_DELETE = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
 const STEPS = [
   {
     title: "Chat",
-    desc: "Tombol WhatsApp di atas — 30 detik, nggak perlu install.",
+    desc: "Klik Tombol WhatsApp di atas — 30 detik, nggak perlu install.",
   },
   {
     title: "Ketik / bicara / foto",
